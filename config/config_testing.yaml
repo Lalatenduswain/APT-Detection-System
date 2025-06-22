@@ -1,0 +1,112 @@
+# APT Detection System Configuration - WEEK 1 TESTING
+
+model_paths:
+  base_dir: models/
+  lightgbm: lightgbm_model.pkl
+  bilstm: bilstm_model.h5
+
+training_params:
+  lightgbm:
+    num_leaves: 31
+    learning_rate: 0.05
+    n_estimators: 100
+
+  bilstm:
+    epochs: 5
+    batch_size: 32
+    lstm_units: 64
+
+split_params:
+  test_size: 0.2
+  random_state: 42
+
+data_paths:
+  dataset: synthetic_apt_dataset.csv
+
+# Data source connectors configuration - DISABLED FOR TESTING
+data_sources:
+  # Wazuh EDR connector configuration
+  wazuh:
+    enabled: false  # Disabled for testing
+    api_url: "https://wazuh.example.com:55000"
+    username: "wazuh-api-user"
+    password: "wazuh-api-password"
+    verify_ssl: true
+    fetch_interval: 60  # Seconds between fetches
+
+  # Elasticsearch SIEM connector configuration
+  elasticsearch:
+    enabled: false  # Disabled for testing
+    hosts: ["localhost:9200"]
+    index_pattern: "winlogbeat-*"
+    username: "elastic"
+    password: "changeme"
+    verify_certs: true
+    fetch_interval: 60  # Seconds between fetches
+
+kafka:
+  bootstrap_servers: localhost:9092
+  topic: apt_topic
+  # Testing Kafka settings
+  group_id: apt_detection_group
+  auto_offset_reset: earliest
+  enable_auto_commit: true
+  session_timeout_ms: 30000
+  request_timeout_ms: 40000
+
+dashboard:
+  host: 127.0.0.1  # Local only for testing
+  port: 5000
+  debug: true  # Enable debug mode for testing
+
+settings:
+  overwrite_models: false  # Don't overwrite existing models
+  log_level: INFO
+  # Data collection settings
+  collection_interval_seconds: 60  # How often to collect data from connectors
+  # Behavioral analytics settings
+  behavioral_analytics:
+    baseline_period_days: 7    # Days of data to use for baseline
+    anomaly_threshold: 0.6     # Threshold for anomaly detection (0.0-1.0)
+    time_window_minutes: 10    # Time window for feature aggregation
+  # Alert settings
+  alerts:
+    max_alerts: 1000           # Reduced for testing
+    retention_days: 7          # Reduced retention for testing
+
+# Simulation configuration - ENABLED FOR TESTING
+simulation:
+  enabled: true                # Enabled for testing
+  realism_level: "basic"
+  output:
+    type: "kafka"
+    redis_key: "apt:alerts"
+    kafka_topic: "apt_topic"
+  entities:
+    hosts:
+      count: 5                 # Reduced for testing
+      prefix: "test-host"
+    users:
+      count: 10                # Reduced for testing
+      prefix: "test-user"
+    networks:
+      count: 2                 # Reduced for testing
+      subnets: ["192.168.1.0/24", "10.0.0.0/24"]
+  events:
+    rate: 2                    # Reduced rate for testing
+    distribution:
+      network: 0.4
+      endpoint: 0.4
+      user: 0.2
+  scenarios:
+    enabled: true              # Enable scenarios for testing
+    frequency: "low"           # Low frequency for testing
+    concurrent: 1              # Single scenario for testing
+  time_patterns:
+    enabled: false             # Disable for consistent testing
+    business_hours:
+      start: 9
+      end: 17
+      days: [0, 1, 2, 3, 4]
+  adaptive_behavior:
+    enabled: false             # Disable for predictable testing

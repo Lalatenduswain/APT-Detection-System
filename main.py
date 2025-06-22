@@ -31,7 +31,8 @@ logging.basicConfig(
 
 def load_config():
     """Load configuration from config.yaml file."""
-    with open('config.yaml', 'r') as file:
+    config_path = os.path.join(os.path.dirname(__file__), 'config', 'config.yaml')
+    with open(config_path, 'r') as file:
         return yaml.safe_load(file)
 
 def run_data_ingestion(config):

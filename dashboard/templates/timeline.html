@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attack Timeline - APT Detection System</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        h1, h2, h3 {
+            color: #333;
+        }
+        .nav {
+            margin-bottom: 20px;
+        }
+        .nav a {
+            margin-right: 15px;
+            color: #007bff;
+            text-decoration: none;
+        }
+        .nav a:hover {
+            text-decoration: underline;
+        }
+        .timeline-container {
+            height: 600px;
+            margin-bottom: 30px;
+        }
+        .technique-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            margin: 2px;
+            border-radius: 3px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+        .technique-initial-access { background-color: #ff6b6b; color: white; }
+        .technique-execution { background-color: #4ecdc4; color: white; }
+        .technique-persistence { background-color: #45b7d1; color: white; }
+        .technique-privilege-escalation { background-color: #96ceb4; color: white; }
+        .technique-defense-evasion { background-color: #ffeaa7; color: #333; }
+        .technique-credential-access { background-color: #dda0dd; color: white; }
+        .technique-discovery { background-color: #98d8c8; color: white; }
+        .technique-lateral-movement { background-color: #f7dc6f; color: #333; }
+        .technique-collection { background-color: #bb8fce; color: white; }
+        .technique-exfiltration { background-color: #ec7063; color: white; }
+        .technique-impact { background-color: #e74c3c; color: white; }
+        .technique-default { background-color: #95a5a6; color: white; }
+        
+        .attack-phase {
+            padding: 10px;
+            margin: 10px 0;
+            border-left: 4px solid #007bff;
+            background-color: #f8f9fa;
+        }
+        .attack-phase h5 {
+            margin: 0 0 10px 0;
+            color: #007bff;
+        }
+        .severity-critical { border-left-color: #dc3545; }
+        .severity-high { border-left-color: #fd7e14; }
+        .severity-medium { border-left-color: #ffc107; }
+        .severity-low { border-left-color: #6c757d; }
+        
+        .controls {
+            margin-bottom: 20px;
+        }
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav">
+            <a href="/">Dashboard</a>
+            <a href="/alerts">Alerts</a>
+            <a href="/metrics">Enhanced Metrics</a>
+            <a href="/models">Models</a>
+            <a href="/connectors">Connectors</a>
+            <a href="/settings">Settings</a>
+            <a href="/timeline">Attack Timeline</a>
+        </div>
+        
+        <h1>🎯 Attack Timeline Visualization</h1>
+        <p>Interactive timeline showing attack progression and MITRE ATT&CK technique mapping over time.</p>
+        
+        <div class="controls">
+            <div class="row">
+                <div class="col-md-4">
+                    <label for="timeRange" class="form-label">Time Range</label>
+                    <select id="timeRange" class="form-select">
+                        <option value="1">Last 1 Hour</option>
+                        <option value="6">Last 6 Hours</option>
+                        <option value="24" selected>Last 24 Hours</option>
+                        <option value="168">Last 7 Days</option>
+                        <option value="720">Last 30 Days</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="entityFilter" class="form-label">Entity Filter</label>
+                    <select id="entityFilter" class="form-select">
+                        <option value="">All Entities</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="severityFilter" class="form-label">Minimum Severity</label>
+                    <select id="severityFilter" class="form-select">
+                        <option value="">All Severities</option>
+                        <option value="Low">Low and above</option>
+                        <option value="Medium">Medium and above</option>
+                        <option value="High">High and above</option>
+                        <option value="Critical">Critical only</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <div class="legend">
+            <h5>MITRE ATT&CK Tactics:</h5>
+            <span class="technique-badge technique-initial-access">Initial Access</span>
+            <span class="technique-badge technique-execution">Execution</span>
+            <span class="technique-badge technique-persistence">Persistence</span>
+            <span class="technique-badge technique-privilege-escalation">Privilege Escalation</span>
+            <span class="technique-badge technique-defense-evasion">Defense Evasion</span>
+            <span class="technique-badge technique-credential-access">Credential Access</span>
+            <span class="technique-badge technique-discovery">Discovery</span>
+            <span class="technique-badge technique-lateral-movement">Lateral Movement</span>
+            <span class="technique-badge technique-collection">Collection</span>
+            <span class="technique-badge technique-exfiltration">Exfiltration</span>
+            <span class="technique-badge technique-impact">Impact</span>
+        </div>
+        
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>📈 Attack Progression Timeline</span>
+                <button id="refreshTimeline" class="btn btn-primary btn-sm">Refresh</button>
+            </div>
+            <div class="card-body">
+                <div class="timeline-container">
+                    <canvas id="timelineChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">🔍 Attack Phases Detected</div>
+                    <div class="card-body">
+                        <div id="attackPhases">
+                            <p class="text-muted">Loading attack phase analysis...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">📊 Technique Frequency</div>
+                    <div class="card-body">
+                        <canvas id="techniqueChart" style="height: 300px;"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let timelineChart = null;
+        let techniqueChart = null;
+        
+        // MITRE ATT&CK tactic color mapping
+        const tacticColors = {
+            'initial-access': '#ff6b6b',
+            'execution': '#4ecdc4',
+            'persistence': '#45b7d1',
+            'privilege-escalation': '#96ceb4',
+            'defense-evasion': '#ffeaa7',
+            'credential-access': '#dda0dd',
+            'discovery': '#98d8c8',
+            'lateral-movement': '#f7dc6f',
+            'collection': '#bb8fce',
+            'exfiltration': '#ec7063',
+            'impact': '#e74c3c'
+        };
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeTimeline();
+            loadTimelineData();
+            
+            // Event listeners
+            document.getElementById('refreshTimeline').addEventListener('click', loadTimelineData);
+            document.getElementById('timeRange').addEventListener('change', loadTimelineData);
+            document.getElementById('entityFilter').addEventListener('change', loadTimelineData);
+            document.getElementById('severityFilter').addEventListener('change', loadTimelineData);
+        });
+        
+        function initializeTimeline() {
+            const ctx = document.getElementById('timelineChart').getContext('2d');
+            
+            timelineChart = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: []
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                displayFormats: {
+                                    hour: 'MMM dd HH:mm',
+                                    day: 'MMM dd'
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Time'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Attack Severity Score'
+                            },
+                            min: 0,
+                            max: 1
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                title: function(context) {
+                                    return new Date(context[0].parsed.x).toLocaleString();
+                                },
+                                label: function(context) {
+                                    const point = context.raw;
+                                    return [
+                                        `Entity: ${point.entity}`,
+                                        `Severity: ${point.severity}`,
+                                        `Score: ${point.y.toFixed(3)}`,
+                                        `Techniques: ${point.techniques.join(', ')}`
+                                    ];
+                                }
+                            }
+                        },
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'point'
+                    }
+                }
+            });
+            
+            // Initialize technique frequency chart
+            const techniqueCtx = document.getElementById('techniqueChart').getContext('2d');
+            techniqueChart = new Chart(techniqueCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        data: [],
+                        backgroundColor: []
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right'
+                        }
+                    }
+                }
+            });
+        }
+        
+        async function loadTimelineData() {
+            try {
+                // Get filter values
+                const timeRange = document.getElementById('timeRange').value;
+                const entityFilter = document.getElementById('entityFilter').value;
+                const severityFilter = document.getElementById('severityFilter').value;
+                
+                // Fetch alerts data
+                const response = await fetch(`/api/alerts?days=${Math.ceil(timeRange/24)}`);
+                const alerts = await response.json();
+                
+                // Process alerts for timeline
+                const timelineData = processAlertsForTimeline(alerts, entityFilter, severityFilter);
+                
+                // Update timeline chart
+                updateTimelineChart(timelineData);
+                
+                // Update technique frequency chart
+                updateTechniqueChart(timelineData);
+                
+                // Update attack phases
+                updateAttackPhases(timelineData);
+                
+                // Update entity filter options
+                updateEntityFilter(alerts);
+                
+            } catch (error) {
+                console.error('Error loading timeline data:', error);
+            }
+        }
+        
+        function processAlertsForTimeline(alerts, entityFilter, severityFilter) {
+            const severityOrder = { 'Critical': 4, 'High': 3, 'Medium': 2, 'Low': 1 };
+            const minSeverity = severityFilter ? severityOrder[severityFilter] : 0;
+            
+            return alerts
+                .filter(alert => {
+                    // Apply entity filter
+                    if (entityFilter && alert.entity !== entityFilter) return false;
+                    
+                    // Apply severity filter
+                    const alertSeverity = severityOrder[alert.severity] || 0;
+                    if (alertSeverity < minSeverity) return false;
+                    
+                    return true;
+                })
+                .map(alert => {
+                    const techniques = alert.mitre_attack?.techniques || [];
+                    const tactics = [...new Set(techniques.map(t => t.tactic).filter(Boolean))];
+                    
+                    return {
+                        x: new Date(alert.timestamp),
+                        y: alert.prediction_score || 0.5,
+                        entity: alert.entity,
+                        severity: alert.severity,
+                        techniques: techniques.map(t => t.technique_id || t.id).filter(Boolean),
+                        tactics: tactics,
+                        alert: alert
+                    };
+                })
+                .sort((a, b) => a.x - b.x);
+        }
+        
+        function updateTimelineChart(data) {
+            // Group data by entity for different datasets
+            const entityGroups = {};
+            data.forEach(point => {
+                if (!entityGroups[point.entity]) {
+                    entityGroups[point.entity] = [];
+                }
+                entityGroups[point.entity].push(point);
+            });
+            
+            // Create datasets for each entity
+            const datasets = Object.keys(entityGroups).map((entity, index) => {
+                const color = `hsl(${(index * 137.5) % 360}, 70%, 50%)`;
+                
+                return {
+                    label: entity,
+                    data: entityGroups[entity],
+                    backgroundColor: color,
+                    borderColor: color,
+                    pointRadius: 6,
+                    pointHoverRadius: 8
+                };
+            });
+            
+            timelineChart.data.datasets = datasets;
+            timelineChart.update();
+        }
+        
+        function updateTechniqueChart(data) {
+            // Count technique frequency
+            const techniqueCount = {};
+            data.forEach(point => {
+                point.techniques.forEach(technique => {
+                    techniqueCount[technique] = (techniqueCount[technique] || 0) + 1;
+                });
+            });
+            
+            // Sort by frequency and take top 10
+            const sortedTechniques = Object.entries(techniqueCount)
+                .sort(([,a], [,b]) => b - a)
+                .slice(0, 10);
+            
+            const labels = sortedTechniques.map(([technique]) => technique);
+            const counts = sortedTechniques.map(([,count]) => count);
+            const colors = labels.map((_, index) => `hsl(${(index * 36) % 360}, 70%, 60%)`);
+            
+            techniqueChart.data.labels = labels;
+            techniqueChart.data.datasets[0].data = counts;
+            techniqueChart.data.datasets[0].backgroundColor = colors;
+            techniqueChart.update();
+        }
+        
+        function updateAttackPhases(data) {
+            const phasesContainer = document.getElementById('attackPhases');
+            
+            if (data.length === 0) {
+                phasesContainer.innerHTML = '<p class="text-muted">No attack phases detected in the selected time range.</p>';
+                return;
+            }
+            
+            // Group alerts by time windows to identify attack phases
+            const phases = identifyAttackPhases(data);
+            
+            let html = '';
+            phases.forEach((phase, index) => {
+                const severityClass = `severity-${phase.severity.toLowerCase()}`;
+                
+                html += `
+                    <div class="attack-phase ${severityClass}">
+                        <h5>Phase ${index + 1}: ${phase.name}</h5>
+                        <p><strong>Time:</strong> ${phase.startTime.toLocaleString()} - ${phase.endTime.toLocaleString()}</p>
+                        <p><strong>Entities:</strong> ${phase.entities.join(', ')}</p>
+                        <p><strong>Techniques:</strong></p>
+                        <div>
+                            ${phase.techniques.map(technique => {
+                                const tacticClass = getTacticClass(technique);
+                                return `<span class="technique-badge ${tacticClass}">${technique}</span>`;
+                            }).join('')}
+                        </div>
+                        <p><strong>Alerts:</strong> ${phase.alertCount}</p>
+                    </div>
+                `;
+            });
+            
+            phasesContainer.innerHTML = html;
+        }
+        
+        function identifyAttackPhases(data) {
+            // Simple phase identification based on time clustering
+            const phases = [];
+            const timeWindow = 30 * 60 * 1000; // 30 minutes
+            
+            let currentPhase = null;
+            
+            data.forEach(point => {
+                if (!currentPhase || point.x - currentPhase.endTime > timeWindow) {
+                    // Start new phase
+                    if (currentPhase) phases.push(currentPhase);
+                    
+                    currentPhase = {
+                        name: `Attack Campaign`,
+                        startTime: point.x,
+                        endTime: point.x,
+                        entities: new Set([point.entity]),
+                        techniques: new Set(point.techniques),
+                        severity: point.severity,
+                        alertCount: 1
+                    };
+                } else {
+                    // Extend current phase
+                    currentPhase.endTime = point.x;
+                    currentPhase.entities.add(point.entity);
+                    point.techniques.forEach(t => currentPhase.techniques.add(t));
+                    currentPhase.alertCount++;
+                    
+                    // Update severity to highest
+                    const severityOrder = { 'Critical': 4, 'High': 3, 'Medium': 2, 'Low': 1 };
+                    if (severityOrder[point.severity] > severityOrder[currentPhase.severity]) {
+                        currentPhase.severity = point.severity;
+                    }
+                }
+            });
+            
+            if (currentPhase) phases.push(currentPhase);
+            
+            // Convert sets to arrays
+            return phases.map(phase => ({
+                ...phase,
+                entities: Array.from(phase.entities),
+                techniques: Array.from(phase.techniques)
+            }));
+        }
+        
+        function updateEntityFilter(alerts) {
+            const entityFilter = document.getElementById('entityFilter');
+            const entities = [...new Set(alerts.map(alert => alert.entity))].sort();
+            
+            // Keep current selection
+            const currentValue = entityFilter.value;
+            
+            // Clear and rebuild options
+            entityFilter.innerHTML = '<option value="">All Entities</option>';
+            entities.forEach(entity => {
+                const option = document.createElement('option');
+                option.value = entity;
+                option.textContent = entity;
+                if (entity === currentValue) option.selected = true;
+                entityFilter.appendChild(option);
+            });
+        }
+        
+        function getTacticClass(technique) {
+            // Map technique to tactic class (simplified)
+            const tacticMapping = {
+                'T1566': 'technique-initial-access',
+                'T1059': 'technique-execution',
+                'T1053': 'technique-persistence',
+                'T1055': 'technique-privilege-escalation',
+                'T1027': 'technique-defense-evasion',
+                'T1003': 'technique-credential-access',
+                'T1082': 'technique-discovery',
+                'T1021': 'technique-lateral-movement',
+                'T1005': 'technique-collection',
+                'T1041': 'technique-exfiltration',
+                'T1486': 'technique-impact'
+            };
+            
+            // Find matching tactic based on technique prefix
+            for (const [prefix, tacticClass] of Object.entries(tacticMapping)) {
+                if (technique.startsWith(prefix)) {
+                    return tacticClass;
+                }
+            }
+            
+            return 'technique-default';
+        }
+    </script>
+</body>
+</html>

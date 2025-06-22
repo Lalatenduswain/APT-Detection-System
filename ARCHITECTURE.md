@@ -103,18 +103,23 @@ The Alert Generation layer creates alerts based on detection results and maps th
 
 ### 5. Dashboard Layer
 
-The Dashboard layer provides visualization and analysis tools for security analysts.
+The Dashboard layer provides real-time visualization and analysis tools for security analysts.
 
 #### Components:
-- **Overview**: Alert statistics, timeline, and top entities
-- **Alerts**: Detailed alert information with filtering
+- **Overview**: Alert statistics, timeline, and top entities with real-time alert streaming
+- **Real-Time Alert Stream**: Live WebSocket-based alert feed with connection monitoring
+- **Attack Timeline**: Interactive visualization showing attack progression over time
+- **Alerts**: Detailed alert information with filtering and MITRE ATT&CK mapping
+- **Enhanced Metrics**: Comprehensive model performance and noise reduction analysis
 - **Entity Analysis**: Entity behavior statistics and anomaly detection
 - **Models**: Status of machine learning models and behavioral baselines
 - **Connectors**: Status and configuration of data source connectors
 
 #### Design Decisions:
 - **Flask Framework**: We chose Flask for the dashboard because it's lightweight, flexible, and easy to integrate with the Python-based backend.
-- **Real-time Updates**: The dashboard retrieves data from Redis to provide real-time updates on alerts and system status.
+- **WebSocket Integration**: Flask-SocketIO provides real-time communication with sub-second latency for live alert streaming.
+- **Interactive Visualizations**: Chart.js enables interactive timeline analysis with MITRE ATT&CK technique mapping.
+- **Real-time Updates**: The dashboard uses both Redis data retrieval and WebSocket streaming for comprehensive real-time monitoring.
 
 ## Data Flow
 

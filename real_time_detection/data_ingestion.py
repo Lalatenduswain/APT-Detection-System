@@ -46,7 +46,7 @@ class DataIngestionManager:
         
         # Load configuration
         if config_path is None:
-            config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config.yaml')
+            config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'config.yaml')
         
         self.load_config(config_path)
         
@@ -170,15 +170,31 @@ class DataIngestionManager:
                     'timestamp': datetime.now().isoformat()
                 }
                 
+                # Apply enhanced MITRE ATT&CK enrichment if available
+                try:
+                    from .enhanced_mitre_mapping import EnhancedMitreMapper
+                    enhanced_mapper = EnhancedMitreMapper()
+                    self.logger.info(f"Applying enhanced MITRE enrichment for Kafka alert: {alert['entity']}")
+                    alert = enhanced_mapper.enrich_alert_enhanced(alert)
+                except Exception as e:
+                    self.logger.warning(f"Enhanced MITRE mapping failed, using standard enrichment: {str(e)}")
+                    # Fallback to standard MITRE enrichment
+                    if 'mitre_attack' not in alert or not alert['mitre_attack'].get('techniques', []):
+                        self.logger.info(f"Enriching Kafka alert for {alert['entity']} with standard MITRE ATT&CK information")
+                        from .mitre_attack_mapping import enrich_alert_with_mitre_attack
+                        alert = enrich_alert_with_mitre_attack(alert)
+                
                 # Store alert for dashboard access
                 self.store_alert(alert)
                 
                 self.logger.info(f"Alert generated from Kafka message with severity: {alert['severity']}")
-                if 'mitre_attack' in alert:
+                if 'mitre_attack' in alert and alert['mitre_attack'].get('techniques', []):
                     techniques = alert['mitre_attack']['techniques']
                     self.logger.info(f"MITRE ATT&CK techniques identified: {len(techniques)}")
                     for technique in techniques[:3]:  # Log first 3 techniques
                         self.logger.info(f"- {technique['id']}: {technique['name']}")
+                else:
+                    self.logger.warning(f"No MITRE ATT&CK techniques identified for Kafka alert: {alert['entity']}")
                 
                 return alert
             else:

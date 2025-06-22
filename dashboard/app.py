@@ -1,17 +1,31 @@
 import os
+import sys
 import yaml
 import logging
+import json
+import time
+import threading
 from datetime import datetime, timedelta
 from flask import Flask, render_template, jsonify, request, redirect, url_for
+from flask_socketio import SocketIO, emit
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from visualization import create_entity_behavior_plot, create_alert_timeline_plot, create_severity_distribution_plot, create_source_distribution_plot, create_entity_feature_plot
 from real_time_detection.data_ingestion import get_alerts, DataIngestionManager
 from real_time_detection.prediction_engine import PredictionEngine
+from models.metrics import EnhancedMetrics
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = 'apt-detection-secret-key'
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Initialize managers
 data_ingestion_manager = None
 prediction_engine = None
+enhanced_metrics = None
+
+# Global variables for real-time streaming
+alert_stream_active = False
+alert_stream_thread = None
 
 # Make visualization functions available in templates
 app.jinja_env.globals.update(
@@ -23,18 +37,21 @@ app.jinja_env.globals.update(
 )
 
 def initialize_managers():
-    """Initialize data ingestion manager and prediction engine."""
-    global data_ingestion_manager, prediction_engine
+    """Initialize data ingestion manager, prediction engine, and enhanced metrics."""
+    global data_ingestion_manager, prediction_engine, enhanced_metrics
     
     if data_ingestion_manager is None:
         data_ingestion_manager = DataIngestionManager()
     
     if prediction_engine is None:
         prediction_engine = PredictionEngine()
+    
+    if enhanced_metrics is None:
+        enhanced_metrics = EnhancedMetrics()
 
 def load_config():
     """Load configuration from config.yaml file."""
-    config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config.yaml')
+    config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'config.yaml')
     with open(config_path, 'r') as file:
         return yaml.safe_load(file)
 
@@ -161,6 +178,120 @@ def alerts():
         selected_entity=entity,
         selected_days=days
     )
+
+@app.route('/metrics')
+def metrics_dashboard():
+    """Display enhanced metrics dashboard."""
+    # Initialize managers if needed
+    initialize_managers()
+    
+    # Get all alerts
+    all_alerts = get_alerts()
+    
+    # Calculate enhanced metrics if we have alerts
+    enhanced_metrics_data = None
+    if all_alerts and enhanced_metrics:
+        try:
+            # Create some baseline alerts for comparison (simulate Week 1 style)
+            baseline_alerts = []
+            for alert in all_alerts[:5]:  # Use first 5 as baseline simulation
+                baseline_alert = {
+                    'entity': alert.get('entity'),
+                    'timestamp': alert.get('timestamp'),
+                    'severity': alert.get('severity', 'Medium'),
+                    'prediction_score': alert.get('prediction_score', 0.5),
+                    'detection_type': alert.get('detection_type', 'behavioral_analytics'),
+                    'mitre_attack': {
+                        'techniques': [],  # No techniques in baseline
+                        'tactics': []
+                    }
+                }
+                baseline_alerts.append(baseline_alert)
+            
+            # Calculate comprehensive metrics
+            enhanced_metrics_data = enhanced_metrics.calculate_comprehensive_metrics(
+                all_alerts, baseline_alerts
+            )
+        except Exception as e:
+            logging.error(f"Error calculating enhanced metrics: {str(e)}")
+            enhanced_metrics_data = None
+    
+    return render_template(
+        'metrics.html',
+        metrics_data=enhanced_metrics_data,
+        alert_count=len(all_alerts)
+    )
+
+@app.route('/api/enhanced_metrics')
+def api_enhanced_metrics():
+    """API endpoint for enhanced metrics data."""
+    # Initialize managers if needed
+    initialize_managers()
+    
+    # Get all alerts
+    all_alerts = get_alerts()
+    
+    if not all_alerts or not enhanced_metrics:
+        return jsonify({
+            'error': 'No alerts available or metrics system not initialized',
+            'alert_count': len(all_alerts)
+        })
+    
+    try:
+        # Create baseline alerts for comparison
+        baseline_alerts = []
+        for alert in all_alerts[:min(5, len(all_alerts))]:
+            baseline_alert = {
+                'entity': alert.get('entity'),
+                'timestamp': alert.get('timestamp'),
+                'severity': alert.get('severity', 'Medium'),
+                'prediction_score': alert.get('prediction_score', 0.5),
+                'detection_type': alert.get('detection_type', 'behavioral_analytics'),
+                'mitre_attack': {
+                    'techniques': [],
+                    'tactics': []
+                }
+            }
+            baseline_alerts.append(baseline_alert)
+        
+        # Calculate comprehensive metrics
+        metrics_data = enhanced_metrics.calculate_comprehensive_metrics(
+            all_alerts, baseline_alerts
+        )
+        
+        return jsonify(metrics_data)
+        
+    except Exception as e:
+        logging.error(f"Error calculating enhanced metrics: {str(e)}")
+        return jsonify({
+            'error': f'Error calculating metrics: {str(e)}',
+            'alert_count': len(all_alerts)
+        }), 500
+
+@app.route('/api/mitre_metrics')
+def api_mitre_metrics():
+    """API endpoint for MITRE ATT&CK specific metrics."""
+    # Initialize managers if needed
+    initialize_managers()
+    
+    # Get all alerts
+    all_alerts = get_alerts()
+    
+    if not all_alerts or not enhanced_metrics:
+        return jsonify({
+            'error': 'No alerts available or metrics system not initialized'
+        })
+    
+    try:
+        # Calculate MITRE-specific metrics
+        mitre_results = enhanced_metrics.mitre_metrics.calculate_mitre_effectiveness(all_alerts)
+        return jsonify(mitre_results)
+        
+    except Exception as e:
+        logging.error(f"Error calculating MITRE metrics: {str(e)}")
+        return jsonify({
+            'error': f'Error calculating MITRE metrics: {str(e)}'
+        }), 500
 
 @app.route('/api/alerts')
 def api_alerts():
@@ -341,6 +472,11 @@ def connectors():
         connector_info=connector_info
     )
 
+@app.route('/timeline')
+def timeline():
+    """Display attack timeline visualization."""
+    return render_template('timeline.html')
+
 @app.route('/settings', methods=['GET', 'POST'])
 def settings():
     """Display and update settings."""
@@ -414,10 +550,122 @@ def api_stats():
         'timeline_data': timeline_data
     })
 
+# WebSocket event handlers
+@socketio.on('connect')
+def handle_connect():
+    """Handle client connection."""
+    logging.info('Client connected to WebSocket')
+    emit('status', {'message': 'Connected to APT Detection System'})
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    """Handle client disconnection."""
+    logging.info('Client disconnected from WebSocket')
+
+@socketio.on('start_alert_stream')
+def handle_start_alert_stream():
+    """Start real-time alert streaming."""
+    global alert_stream_active, alert_stream_thread
+    
+    if not alert_stream_active:
+        alert_stream_active = True
+        alert_stream_thread = threading.Thread(target=alert_stream_worker)
+        alert_stream_thread.daemon = True
+        alert_stream_thread.start()
+        emit('stream_status', {'active': True, 'message': 'Alert stream started'})
+        logging.info('Alert stream started')
+    else:
+        emit('stream_status', {'active': True, 'message': 'Alert stream already active'})
+
+@socketio.on('stop_alert_stream')
+def handle_stop_alert_stream():
+    """Stop real-time alert streaming."""
+    global alert_stream_active
+    
+    alert_stream_active = False
+    emit('stream_status', {'active': False, 'message': 'Alert stream stopped'})
+    logging.info('Alert stream stopped')
+
+def alert_stream_worker():
+    """Worker function for streaming alerts in real-time."""
+    global alert_stream_active
+    
+    last_alert_count = 0
+    
+    while alert_stream_active:
+        try:
+            # Get current alerts
+            all_alerts = get_alerts()
+            current_count = len(all_alerts)
+            
+            # Check if we have new alerts
+            if current_count > last_alert_count:
+                # Get the new alerts
+                new_alerts = all_alerts[last_alert_count:]
+                
+                for alert in new_alerts:
+                    # Format alert for streaming
+                    stream_alert = {
+                        'id': alert.get('id', f"alert_{int(time.time())}"),
+                        'timestamp': alert.get('timestamp', datetime.now().isoformat()),
+                        'entity': alert.get('entity', 'Unknown'),
+                        'severity': alert.get('severity', 'Medium'),
+                        'prediction_score': alert.get('prediction_score', 0.5),
+                        'detection_type': alert.get('detection_type', 'behavioral_analytics'),
+                        'mitre_techniques': [t.get('technique_id', '') for t in alert.get('mitre_attack', {}).get('techniques', [])],
+                        'description': alert.get('description', 'Anomalous behavior detected')
+                    }
+                    
+                    # Emit new alert to all connected clients
+                    socketio.emit('new_alert', stream_alert)
+                
+                last_alert_count = current_count
+            
+            # Update dashboard statistics
+            stats = {
+                'total_alerts': current_count,
+                'timestamp': datetime.now().isoformat()
+            }
+            socketio.emit('stats_update', stats)
+            
+            # Sleep for a short interval
+            time.sleep(2)
+            
+        except Exception as e:
+            logging.error(f"Error in alert stream worker: {str(e)}")
+            time.sleep(5)
+
+@app.route('/api/stream/start')
+def api_start_stream():
+    """API endpoint to start alert streaming."""
+    global alert_stream_active, alert_stream_thread
+    
+    if not alert_stream_active:
+        alert_stream_active = True
+        alert_stream_thread = threading.Thread(target=alert_stream_worker)
+        alert_stream_thread.daemon = True
+        alert_stream_thread.start()
+        return jsonify({'status': 'started', 'message': 'Alert stream started'})
+    else:
+        return jsonify({'status': 'already_active', 'message': 'Alert stream already active'})
+
+@app.route('/api/stream/stop')
+def api_stop_stream():
+    """API endpoint to stop alert streaming."""
+    global alert_stream_active
+    
+    alert_stream_active = False
+    return jsonify({'status': 'stopped', 'message': 'Alert stream stopped'})
+
+@app.route('/api/stream/status')
+def api_stream_status():
+    """API endpoint to get stream status."""
+    return jsonify({'active': alert_stream_active})
+
 def run(host=None, port=None, debug=None):
     """Run the Flask application with configurable parameters."""
     logging.basicConfig(level=logging.INFO)
-    logging.info("Starting Flask app...")
+    logging.info("Starting Flask app with SocketIO...")
     
     # Initialize managers
     initialize_managers()
@@ -429,7 +677,7 @@ def run(host=None, port=None, debug=None):
         port = port or config['dashboard']['port']
         debug = debug if debug is not None else config['dashboard']['debug']
     
-    app.run(host=host, port=port, debug=debug, use_reloader=False)
+    socketio.run(app, host=host, port=port, debug=debug, use_reloader=False)
 
 if __name__ == '__main__':
     run()

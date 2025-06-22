@@ -66,6 +66,12 @@ dashboard:
   debug: false  # Disable debug mode in production
 ```
 
+The dashboard includes real-time features that provide:
+- **Real-time alert streaming** with WebSocket support
+- **Interactive attack timeline** visualization
+- **Live connection monitoring** and status indicators
+- **Enhanced metrics** with comprehensive analysis
+
 ### Other Settings
 
 ```yaml

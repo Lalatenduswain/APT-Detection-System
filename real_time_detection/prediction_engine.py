@@ -10,6 +10,7 @@ from tensorflow.keras.models import load_model
 
 # Import internal modules
 from .mitre_attack_mapping import generate_alert
+from .enhanced_mitre_mapping import EnhancedMitreMapper
 from .behavioral_analytics import BehavioralAnalytics
 from .connectors.connector_manager import ConnectorManager
 
@@ -44,7 +45,7 @@ class PredictionEngine:
         
         # Load configuration
         if config_path is None:
-            config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config.yaml')
+            config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'config.yaml')
         
         self.load_config(config_path)
         
@@ -59,6 +60,16 @@ class PredictionEngine:
         
         # Initialize behavioral analytics
         self.behavioral_analytics = BehavioralAnalytics(config_path)
+        
+        # Initialize enhanced MITRE mapper
+        try:
+            self.enhanced_mitre_mapper = EnhancedMitreMapper(config_path)
+            self.use_enhanced_mitre = True
+            self.logger.info("Enhanced MITRE mapper initialized successfully")
+        except Exception as e:
+            self.logger.warning(f"Failed to initialize enhanced MITRE mapper: {str(e)}")
+            self.enhanced_mitre_mapper = None
+            self.use_enhanced_mitre = False
         
         # Load baseline models if available
         try:
@@ -336,20 +347,35 @@ class PredictionEngine:
                         # Add entity and timestamp information
                         alert['entity'] = row.get(entity_column, 'unknown')
                         alert['timestamp'] = row.get('time_window', datetime.now())
+                        alert['entity_type'] = entity_column
+                        alert['detection_type'] = 'ml_prediction'
                         
                         # Add anomaly score if available
                         if 'anomaly_score' in row:
                             alert['anomaly_score'] = float(row['anomaly_score'])
                         
+                        # Apply enhanced MITRE ATT&CK enrichment if available
+                        if self.use_enhanced_mitre and self.enhanced_mitre_mapper:
+                            self.logger.info(f"Applying enhanced MITRE enrichment for {alert['entity']}")
+                            alert = self.enhanced_mitre_mapper.enrich_alert_enhanced(alert)
+                        else:
+                            # Fallback to standard MITRE enrichment
+                            if 'mitre_attack' not in alert or not alert['mitre_attack']['techniques']:
+                                self.logger.info(f"Re-enriching alert for {alert['entity']} with standard MITRE ATT&CK information")
+                                from .mitre_attack_mapping import enrich_alert_with_mitre_attack
+                                alert = enrich_alert_with_mitre_attack(alert)
+                        
                         # Add to alerts list
                         result['alerts'].append(alert)
                         
                         self.logger.info(f"Alert generated for {alert['entity']} with severity: {alert['severity']}")
-                        if 'mitre_attack' in alert:
+                        if 'mitre_attack' in alert and alert['mitre_attack']['techniques']:
                             techniques = alert['mitre_attack']['techniques']
                             self.logger.info(f"MITRE ATT&CK techniques identified: {len(techniques)}")
                             for technique in techniques[:3]:  # Log first 3 techniques
                                 self.logger.info(f"- {technique['id']}: {technique['name']}")
+                        else:
+                            self.logger.warning(f"No MITRE ATT&CK techniques identified for {alert['entity']}")
             
             # If we have anomaly alerts but no ML model alerts, add them to the alerts list
             if not result['alerts'] and anomaly_alerts:

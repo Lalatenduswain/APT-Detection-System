@@ -366,15 +366,26 @@ python simulation_runner.py --duration 30
 
 ## Dashboard
 
-The system includes a comprehensive dashboard for monitoring and analysis, accessible at `http://localhost:5000` when the dashboard is running.
+The system includes a comprehensive real-time dashboard for monitoring and analysis, accessible at `http://localhost:5000` when the dashboard is running.
 
 ### Dashboard Features
 
-- **Overview**: Alert statistics, timeline, and top entities
+- **Overview**: Alert statistics, timeline, and top entities with **real-time alert streaming**
+- **Real-Time Alert Stream**: Live WebSocket-based alert feed with smooth animations and connection monitoring
+- **Attack Timeline**: Interactive visualization showing attack progression over time with MITRE ATT&CK technique mapping
 - **Alerts**: Detailed alert information with filtering and MITRE ATT&CK mapping
+- **Enhanced Metrics**: Comprehensive model performance and noise reduction analysis
 - **Entity Analysis**: Entity behavior statistics and anomaly detection
 - **Models**: Status of machine learning models and behavioral baselines
 - **Connectors**: Status and configuration of data source connectors
+
+### Real-Time Capabilities
+
+- **WebSocket Integration**: Real-time alert streaming with <1 second latency
+- **Live Visualizations**: Interactive charts that update automatically
+- **Attack Timeline Analysis**: Time-based filtering and attack phase detection
+- **Connection Monitoring**: Visual status indicators for system health
+- **Professional Animations**: Smooth transitions and visual feedback
 
 ## Project Structure
 

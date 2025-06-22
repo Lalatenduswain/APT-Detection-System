@@ -1,10 +1,30 @@
 # Dashboard for APT Detection System
 
-This document provides detailed information about the dashboard component of the APT Detection System, including its features, architecture, customization options, and usage.
+This document provides detailed information about the dashboard component of the APT Detection System, including its real-time features, WebSocket architecture, interactive visualizations, and usage.
 
 ## Overview
 
-The dashboard provides a comprehensive visualization and analysis interface for the APT Detection System. It allows security analysts to monitor alerts, analyze entity behavior, and investigate potential threats in real-time.
+The dashboard provides a comprehensive real-time visualization and analysis interface for the APT Detection System. It allows security analysts to monitor alerts, analyze entity behavior, and investigate potential threats with live WebSocket streaming, interactive attack timeline analysis, and enhanced metrics visualization.
+
+## Real-Time Features
+
+### Real-Time Alert Streaming
+- **WebSocket Integration**: Live alert feed with sub-second latency using Flask-SocketIO
+- **Animated Alert Display**: Smooth animations for new alerts with visual feedback
+- **Connection Monitoring**: Real-time status indicators showing system connectivity
+- **Stream Controls**: Start/stop controls for managing real-time data flow
+
+### Interactive Attack Timeline
+- **Timeline Visualization**: Interactive scatter plot showing attack progression over time
+- **MITRE ATT&CK Integration**: Color-coded tactics with comprehensive technique mapping
+- **Advanced Filtering**: Time range, entity, and severity-based filtering capabilities
+- **Attack Phase Detection**: Automatic grouping of related alerts into attack campaigns
+- **Technique Analysis**: Frequency analysis with interactive charts for technique distribution
+
+### Enhanced Navigation
+- **Attack Timeline Page**: Dedicated page for timeline analysis and attack progression (`/timeline`)
+- **Comprehensive Navigation**: Consistent navigation across all dashboard pages
+- **Intuitive Flow**: Dashboard → Alerts → Enhanced Metrics → Attack Timeline → Models → Connectors → Settings
 
 ## Features
 
